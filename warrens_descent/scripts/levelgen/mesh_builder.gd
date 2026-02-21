@@ -7,8 +7,8 @@ class_name MeshBuilder
 ## the visual + collision together with a single transform.
 
 # Door opening dimensions (meters)
-const DOOR_WIDTH := 3.0
-const DOOR_HEIGHT := 4.0
+const DOOR_WIDTH := 4.0
+const DOOR_HEIGHT := 5.0
 
 
 ## Creates a box with mesh + static body under a single Node3D wrapper.
@@ -143,6 +143,42 @@ static func add_doorway(parent: Node3D, pos: Vector3, facing: Vector3, doorway_n
 	marker.set_meta("is_doorway", true)
 	parent.add_child(marker)
 	return marker
+
+
+## Creates a platform (floor slab with collision). The platform is a box
+## centered at pos, with given width/depth and a fixed 0.5m thickness.
+static func add_platform(parent: Node3D, width: float, depth: float, pos: Vector3, mat: StandardMaterial3D) -> Node3D:
+	return add_box(parent, Vector3(width, 0.5, depth), pos, mat)
+
+
+## Creates a cylindrical column with mesh + static body collision.
+static func add_cylinder_column(parent: Node3D, radius: float, height: float, pos: Vector3, mat: StandardMaterial3D) -> Node3D:
+	var holder := Node3D.new()
+	holder.position = pos
+	parent.add_child(holder)
+
+	var mesh_inst := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = radius
+	cyl.bottom_radius = radius
+	cyl.height = height
+	mesh_inst.mesh = cyl
+	mesh_inst.material_override = mat
+	holder.add_child(mesh_inst)
+
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	holder.add_child(body)
+
+	var col := CollisionShape3D.new()
+	var shape := CylinderShape3D.new()
+	shape.radius = radius
+	shape.height = height
+	col.shape = shape
+	body.add_child(col)
+
+	return holder
 
 
 # ---------------------------------------------------------------------------

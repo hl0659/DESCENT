@@ -5,8 +5,9 @@ signal arena_cleared()
 
 @export var enemy_grunt_scene: PackedScene
 @export var enemy_flying_scene: PackedScene
+var enemy_boss_scene: PackedScene
 
-var chunk: ChunkBase = null
+var chunk: GridChunkBase = null
 var is_active: bool = false
 var is_cleared: bool = false
 var waves: Dictionary = {}  # wave_number -> Array[Marker3D]
@@ -21,10 +22,11 @@ var enemy_ground_multiplier: float = 1.0
 var enemy_flying_multiplier: float = 1.0
 
 
-func setup(arena_chunk: ChunkBase, grunt_scene: PackedScene, flying_scene: PackedScene, level: int = 1) -> void:
+func setup(arena_chunk: GridChunkBase, grunt_scene: PackedScene, flying_scene: PackedScene, boss_scene: PackedScene, level: int = 1) -> void:
 	chunk = arena_chunk
 	enemy_grunt_scene = grunt_scene
 	enemy_flying_scene = flying_scene
+	enemy_boss_scene = boss_scene
 	level_number = level
 	_calculate_multipliers()
 	_organize_waves()
@@ -70,21 +72,16 @@ func _create_trigger_area() -> void:
 	var col := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 
-	# Size trigger from doorway markers, inset 2m from entry so the player
-	# must cross the threshold before the arena activates.
-	var entry_marker := chunk.get_entry()
-	var exit_marker := chunk.get_exit()
-	if entry_marker and exit_marker:
-		var trigger_z_min := entry_marker.position.z + 2.0
-		var trigger_z_max := exit_marker.position.z
-		var depth := trigger_z_max - trigger_z_min
-		var center_z := (trigger_z_min + trigger_z_max) * 0.5
-		shape.size = Vector3(40.0, 6.0, depth)
-		col.position = Vector3(0, 3.0, center_z)
-	else:
-		shape.size = Vector3(40.0, 6.0, 40.0)
-		col.position = Vector3(0, 3.0, 0)
-
+	# Size trigger from chunk dimensions
+	var arena_span: float = GridChunkBase.CELL_SIZE * 2.0
+	if chunk.is_boss_arena():
+		arena_span = GridChunkBase.CELL_SIZE * 3.0
+	shape.size = Vector3(arena_span, chunk.get_wall_height(), arena_span)
+	# Center the trigger area in the arena footprint
+	# Chunk origin is at root cell center, so offset to footprint center
+	var offset_x: float = (arena_span - GridChunkBase.CELL_SIZE) * 0.5
+	var offset_z: float = offset_x
+	col.position = Vector3(offset_x, chunk.get_wall_height() * 0.5, offset_z)
 	col.shape = shape
 	trigger_area.add_child(col)
 
@@ -113,18 +110,42 @@ func _activate() -> void:
 
 
 func _lock_doors() -> void:
-	# Create physical blockers at each doorway
-	for doorway_name in ["entry", "exit"]:
-		var marker: Marker3D = chunk.get_node_or_null(doorway_name) as Marker3D
-		if not marker:
-			continue
-		var blocker := MeshBuilder.add_box(
-			chunk,
-			Vector3(MeshBuilder.DOOR_WIDTH, MeshBuilder.DOOR_HEIGHT, 0.5),
-			marker.position,
-			LevelMaterials.door_mat()
-		)
-		door_blockers.append(blocker)
+	# Create physical blockers at each connected doorway
+	if not chunk or not chunk.cell_data:
+		return
+	var siblings := chunk.grid.get_multi_cell_siblings(chunk.cell_data.grid_pos)
+	for cell_pos in siblings:
+		var cell: LevelGrid.CellData = chunk.grid.cells[cell_pos]
+		for dir in cell.connections:
+			if not cell.connections[dir]:
+				continue
+			var neighbor_pos: Vector2i = cell_pos + dir
+			if neighbor_pos in siblings:
+				continue  # Internal edge, no door
+			# Build blocker at this doorway
+			var cell_offset := Vector3(
+				(cell_pos.x - chunk.cell_data.grid_pos.x) * GridChunkBase.CELL_SIZE,
+				0,
+				(cell_pos.y - chunk.cell_data.grid_pos.y) * GridChunkBase.CELL_SIZE
+			)
+			var half_cell := GridChunkBase.CELL_SIZE * 0.5
+			var door_pos: Vector3
+			match dir:
+				LevelGrid.NORTH:
+					door_pos = cell_offset + Vector3(0, GridChunkBase.DOOR_HEIGHT * 0.5, -half_cell)
+				LevelGrid.SOUTH:
+					door_pos = cell_offset + Vector3(0, GridChunkBase.DOOR_HEIGHT * 0.5, half_cell)
+				LevelGrid.EAST:
+					door_pos = cell_offset + Vector3(half_cell, GridChunkBase.DOOR_HEIGHT * 0.5, 0)
+				LevelGrid.WEST:
+					door_pos = cell_offset + Vector3(-half_cell, GridChunkBase.DOOR_HEIGHT * 0.5, 0)
+			var blocker := MeshBuilder.add_box(
+				chunk,
+				Vector3(MeshBuilder.DOOR_WIDTH, MeshBuilder.DOOR_HEIGHT, 0.5),
+				door_pos,
+				LevelMaterials.door_mat()
+			)
+			door_blockers.append(blocker)
 
 
 func _unlock_doors() -> void:
@@ -148,20 +169,29 @@ func _spawn_wave(wave_num: int) -> void:
 		# Apply scaling: spawn extra enemies based on multiplier
 		var count: int = maxi(1, roundi(multiplier))
 		for i in count:
-			var offset := Vector3(randf_range(-1.0, 1.0), 0, randf_range(-1.0, 1.0)) * float(i)
+			var offset := Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0)) * float(i)
+			if enemy_type == "flying":
+				offset.y = randf_range(0.0, 3.0)
 			_spawn_enemy_at(spawn_point.global_position + offset, enemy_type)
 
 
 func _spawn_enemy_at(pos: Vector3, enemy_type: String) -> void:
-	var scene: PackedScene = enemy_grunt_scene if enemy_type == "ground" else enemy_flying_scene
+	var scene: PackedScene
+	match enemy_type:
+		"boss":
+			scene = enemy_boss_scene
+		"flying":
+			scene = enemy_flying_scene
+		_:
+			scene = enemy_grunt_scene
 	if not scene:
-		scene = enemy_grunt_scene  # Fallback
+		scene = enemy_grunt_scene
 	if not scene:
 		return
 
 	var enemy: Node3D = scene.instantiate()
-	enemy.position = pos
 	get_tree().current_scene.add_child(enemy)
+	enemy.global_position = pos
 	active_enemies.append(enemy)
 
 	if enemy.has_signal("enemy_died"):

@@ -239,3 +239,13 @@ static func wave_spawn_horn() -> AudioStreamWAV:
 		var grit: float = sin(t * TAU * 540.0) * 0.15
 		return (base + overtone + grit) * envelope * 0.6
 	)
+
+
+static func wall_break() -> AudioStreamWAV:
+	return _make_wav(0.25, func(t: float, _d: float) -> float:
+		var envelope: float = exp(-t * 8.0)
+		var bass: float = sin(t * TAU * 40.0)
+		var crack: float = sin(t * TAU * 200.0 + sin(t * TAU * 80.0) * 4.0) * exp(-t * 30.0)
+		var debris: float = sin(t * 8417.0) * sin(t * 5119.0) * sin(t * 2371.0)
+		return (bass * 0.3 + crack * 0.3 + debris * 0.4) * envelope * 0.8
+	)
