@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/pickups/pneuma_pickup.gd" id="1_pneuma"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_pneuma"]
+radius = 0.2
+height = 0.4
+
+[sub_resource type="StandardMaterial3D" id="Mat_pneuma"]
+albedo_color = Color(0.5, 0.85, 1.0, 1)
+emission_enabled = true
+emission = Color(0.3, 0.6, 1.0, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pneuma"]
+radius = 0.4
+
+[node name="PneumaPickup" type="Area3D"]
+collision_layer = 16
+collision_mask = 2
+script = ExtResource("1_pneuma")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_pneuma")
+surface_material_override/0 = SubResource("Mat_pneuma")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_pneuma")

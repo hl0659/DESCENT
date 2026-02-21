@@ -1,0 +1,71 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/player/camera_effects.gd" id="2_camera"]
+[ext_resource type="Script" path="res://scripts/player/weapon_manager.gd" id="3_wm"]
+[ext_resource type="Script" path="res://scripts/weapons/shotgun.gd" id="4_shotgun"]
+[ext_resource type="Script" path="res://scripts/weapons/smg.gd" id="5_smg"]
+[ext_resource type="Script" path="res://scripts/weapons/revolver.gd" id="6_revolver"]
+[ext_resource type="PackedScene" path="res://assets/models/colt_python/colt_python.fbx" id="7_colt_model"]
+[ext_resource type="Texture2D" path="res://assets/textures/colt_python/colt_python.png" id="8_colt_tex"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_001"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_shotgun"]
+size = Vector3(0.12, 0.18, 0.55)
+
+[sub_resource type="StandardMaterial3D" id="Mat_shotgun"]
+albedo_color = Color(0.6, 0.5, 0.35, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_smg"]
+size = Vector3(0.08, 0.12, 0.45)
+
+[sub_resource type="StandardMaterial3D" id="Mat_revolver"]
+albedo_texture = ExtResource("8_colt_tex")
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 13
+script = ExtResource("1_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_001")
+
+[node name="CameraHolder" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+
+[node name="CameraEffects" type="Node3D" parent="CameraHolder"]
+script = ExtResource("2_camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraHolder/CameraEffects"]
+fov = 90.0
+
+[node name="WeaponHolder" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+
+[node name="WeaponManager" type="Node3D" parent="WeaponHolder"]
+script = ExtResource("3_wm")
+
+[node name="Shotgun" type="Node3D" parent="WeaponHolder/WeaponManager"]
+script = ExtResource("4_shotgun")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WeaponHolder/WeaponManager/Shotgun"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, -0.25, -0.5)
+mesh = SubResource("BoxMesh_shotgun")
+surface_material_override/0 = SubResource("Mat_shotgun")
+
+[node name="SMG" type="Node3D" parent="WeaponHolder/WeaponManager"]
+script = ExtResource("5_smg")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WeaponHolder/WeaponManager/SMG"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, -0.25, -0.5)
+mesh = SubResource("BoxMesh_smg")
+
+[node name="ColtPython" type="Node3D" parent="WeaponHolder/WeaponManager"]
+script = ExtResource("6_revolver")
+
+[node name="Model" parent="WeaponHolder/WeaponManager/ColtPython" instance=ExtResource("7_colt_model")]
+transform = Transform3D(0, 0, 0.12, 0, 0.12, 0, -0.12, 0, 0, 0.35, -0.25, -0.5)
